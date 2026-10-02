@@ -1,0 +1,331 @@
+/* ===================================================================
+   HK EVENT MANAGEMENT — RESPONSIVE MEDIA QUERIES
+   =================================================================== */
+
+/* Mobile Nav Drawer */
+.mobile-nav-drawer {
+  position: fixed;
+  top: 0;
+  right: -100%;
+  width: 100%;
+  max-width: 380px;
+  height: 100%;
+  background: #ffffff;
+  z-index: 10001;
+  box-shadow: -10px 0 30px rgba(0, 0, 0, 0.15);
+  display: flex;
+  flex-direction: column;
+  transition: right 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  padding: 32px 28px;
+}
+
+.mobile-nav-drawer.active {
+  right: 0;
+}
+
+.mobile-nav-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  z-index: 10000;
+  display: none;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.mobile-nav-backdrop.active {
+  display: block;
+  opacity: 1;
+}
+
+.mobile-nav-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--border-subtle);
+  margin-bottom: 24px;
+}
+
+.mobile-nav-links {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 32px;
+}
+
+.mobile-nav-links a {
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  display: block;
+  padding: 8px 0;
+  transition: color var(--transition-fast);
+}
+
+.mobile-nav-links a:hover, .mobile-nav-links a.active {
+  color: var(--gold-primary);
+}
+
+.mobile-nav-contact {
+  margin-top: auto;
+  padding-top: 24px;
+  border-top: 1px solid var(--border-subtle);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  font-size: 0.88rem;
+  color: var(--text-secondary);
+}
+
+/* Breakpoints */
+
+/* Large Tablets / Small Laptops (1024px) */
+@media (max-width: 1024px) {
+  .hero-grid {
+    grid-template-columns: 1fr;
+    gap: 48px;
+  }
+  
+  .hero-media-wrap {
+    max-width: 520px;
+    margin: 0 auto;
+  }
+
+  .footer-top {
+    grid-template-columns: 1fr 1fr;
+    gap: 40px;
+  }
+
+  .founder-card {
+    grid-template-columns: 1fr;
+    padding: 36px;
+    text-align: center;
+  }
+
+  .founder-img-wrap {
+    max-width: 240px;
+    margin: 0 auto;
+  }
+  
+  .founder-quote-icon {
+    left: 50%;
+    transform: translateX(-50%);
+    top: -20px;
+  }
+
+  .why-us-grid {
+    grid-template-columns: 1fr;
+    gap: 48px;
+  }
+
+  .contact-grid {
+    grid-template-columns: 1fr;
+    gap: 36px;
+  }
+}
+
+/* Tablets (768px) */
+@media (max-width: 768px) {
+  .top-bar {
+    display: none;
+  }
+
+  .nav-links, .nav-actions .btn {
+    display: none;
+  }
+
+  .nav-toggle-btn {
+    display: flex;
+  }
+
+  .section {
+    padding: 64px 0;
+  }
+
+  .section-header {
+    margin-bottom: 40px;
+  }
+
+  .hero {
+    padding: 60px 0 80px;
+  }
+
+  .hero-badges-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 18px;
+  }
+
+  .hero-floating-card {
+    position: static;
+    margin-top: 20px;
+    max-width: 100%;
+  }
+
+  .hero-floating-badge {
+    top: 12px;
+    right: 12px;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+
+  .form-card {
+    padding: 28px 20px;
+  }
+
+  /* Founder card mobile styling */
+  .founder-card {
+    padding: 32px 20px;
+    gap: 28px;
+  }
+
+  .founder-details {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .founder-speech {
+    font-size: 0.98rem;
+    line-height: 1.65;
+    margin-bottom: 22px;
+    padding: 0 4px;
+    word-break: normal;
+    overflow-wrap: break-word;
+  }
+
+  .founder-actions {
+    flex-direction: column;
+    width: 100%;
+    gap: 12px;
+  }
+
+  .founder-actions .btn {
+    width: 100%;
+    text-align: center;
+    justify-content: center;
+  }
+
+  /* Contact page card mobile styling */
+  .contact-info-card {
+    padding: 28px 20px;
+    margin-bottom: 20px;
+  }
+
+  .contact-whatsapp-card {
+    padding: 24px 20px;
+  }
+
+  .footer-top {
+    grid-template-columns: 1fr;
+    gap: 36px;
+  }
+
+  .footer-bottom {
+    flex-direction: column;
+    gap: 12px;
+    text-align: center;
+  }
+
+  .lightbox-body {
+    padding: 0 20px;
+  }
+
+  .lightbox-nav-btn {
+    width: 44px;
+    height: 44px;
+    font-size: 1.1rem;
+  }
+
+  .lightbox-prev-btn { left: 8px; }
+  .lightbox-next-btn { right: 8px; }
+
+  .lightbox-hints {
+    display: none;
+  }
+
+  .whatsapp-floating {
+    bottom: 20px;
+    right: 20px;
+    padding: 10px 14px;
+  }
+
+  .whatsapp-floating span {
+    display: none;
+  }
+}
+
+/* Small Mobile (480px) */
+@media (max-width: 480px) {
+  .container {
+    padding: 0 16px;
+  }
+
+  .hero-cta-group {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .hero-cta-group .btn {
+    width: 100%;
+  }
+
+  .cta-banner {
+    padding: 40px 24px;
+  }
+
+  .cta-buttons-wrap {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .cta-buttons-wrap .btn {
+    width: 100%;
+  }
+
+  .services-grid, .projects-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* Founder card small mobile */
+  .founder-card {
+    padding: 26px 16px;
+    gap: 22px;
+  }
+
+  .founder-details h3 {
+    font-size: 1.55rem;
+  }
+
+  .founder-title {
+    font-size: 0.88rem;
+    margin-bottom: 16px;
+  }
+
+  .founder-speech {
+    font-size: 0.92rem;
+    line-height: 1.6;
+    padding: 0;
+  }
+
+  /* Contact page small mobile */
+  .contact-grid {
+    gap: 24px;
+  }
+
+  .contact-info-card {
+    padding: 22px 14px;
+  }
+
+  .contact-whatsapp-card {
+    padding: 20px 14px;
+  }
+}

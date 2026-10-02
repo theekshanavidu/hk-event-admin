@@ -1,0 +1,26 @@
+{
+  "name": "hk-event-admin",
+  "version": "1.0.0",
+  "description": "HK Event Management — Admin Control Center & REST API Backend",
+  "main": "server.js",
+  "scripts": {
+    "build": "echo \"Build completed successfully\"",
+    "start": "node server.js",
+    "dev": "node server.js",
+    "deploy": "wrangler deploy",
+    "preview": "wrangler dev"
+  },
+  "keywords": ["events", "admin", "api", "r2", "firebase", "hk-event"],
+  "type": "commonjs",
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.1142.0",
+    "cors": "^2.8.6",
+    "dotenv": "^18.0.4",
+    "express": "^5.2.1",
+    "firebase": "^12.19.0",
+    "multer": "^2.4.0"
+  },
+  "devDependencies": {
+    "wrangler": "^3.114.0"
+  }
+}

@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Portal Login | HK Event Management</title>
+  <link rel="icon" type="image/png" href="/admin/logo.png">
+  <link rel="stylesheet" href="/assets/css/variables.css">
+  <link rel="stylesheet" href="/assets/css/global.css">
+  <link rel="stylesheet" href="/admin/css/admin.css">
+</head>
+<body style="background:radial-gradient(circle at 50% 30%, #fef8eb 0%, #f1f5f9 100%);display:flex;align-items:center;justify-content:center;min-height:100vh;padding:24px;">
+
+  <div style="width:100%;max-width:440px;background:#ffffff;border:1px solid var(--admin-border);border-radius:16px;box-shadow:0 20px 40px rgba(15,23,42,0.08);padding:40px 36px;text-align:center;">
+    
+    <a href="/" style="display:inline-block;margin-bottom:20px;">
+      <img src="/admin/logo.png" alt="HK Event Logo" style="width:68px;height:68px;border-radius:50%;margin:0 auto;box-shadow:0 4px 14px rgba(198,146,20,0.25);border:1px solid rgba(198,146,20,0.3);">
+    </a>
+
+    <div class="subheading-badge" style="margin-bottom:8px;">Administrative Control</div>
+    <h2 style="font-size:1.8rem;margin-bottom:8px;">HK Event Portal</h2>
+    <p style="color:var(--admin-text-sub);font-size:0.88rem;margin-bottom:28px;">Sign in with your administrator credentials to review client inquiries, manage event albums, and control website content.</p>
+
+    <div id="login-error-alert" style="display:none;background:#fee2e2;color:#b91c1c;padding:12px;border-radius:8px;font-size:0.85rem;margin-bottom:20px;text-align:left;">
+      Invalid email or password.
+    </div>
+
+    <form id="admin-login-form" style="text-align:left;">
+      <div style="margin-bottom:18px;">
+        <label style="display:block;font-size:0.85rem;font-weight:600;margin-bottom:6px;color:var(--admin-text-main);">Admin Email</label>
+        <input type="email" id="login-email" class="form-input" placeholder="admin@hkevent.lk" required value="keshara@hkevent.lk">
+      </div>
+
+      <div style="margin-bottom:24px;">
+        <label style="display:block;font-size:0.85rem;font-weight:600;margin-bottom:6px;color:var(--admin-text-main);">Password</label>
+        <input type="password" id="login-password" class="form-input" placeholder="••••••••" required value="admin123">
+      </div>
+
+      <button type="submit" id="login-submit-btn" class="btn btn-primary" style="width:100%;padding:14px;font-size:0.95rem;">
+        <span>Authenticate & Access Dashboard</span>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+      </button>
+    </form>
+
+    <div style="margin-top:20px;padding-top:20px;border-top:1px dashed var(--admin-border);">
+      <button type="button" class="btn btn-outline btn-sm" onclick="demoLogin()" style="width:100%;display:flex;align-items:center;justify-content:center;gap:10px;">
+        <img src="https://pub-c47f04a613d14342a14ecef1be67548b.r2.dev/projects/covers/1790810432292-sahan.png" alt="Keshara Sahan" style="width:24px;height:24px;border-radius:50%;object-fit:cover;object-position:center top;border:1px solid var(--admin-gold);">
+        <span>⚡ Quick Access as Keshara Sahan</span>
+      </button>
+    </div>
+
+    <div style="margin-top:24px;text-align:center;">
+      <a href="/" style="font-size:0.82rem;color:var(--admin-text-sub);text-decoration:none;">← Return to Public Website</a>
+    </div>
+  </div>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      // Check if session exists
+      const session = localStorage.getItem("hk_admin_session");
+      if (session) {
+        try {
+          const user = JSON.parse(session);
+          if (user && user.role === "admin") {
+            window.location.href = "/admin/dashboard";
+            return;
+          }
+        } catch(e) {}
+      }
+
+      const form = document.getElementById("admin-login-form");
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const email = document.getElementById("login-email").value.trim();
+        const password = document.getElementById("login-password").value.trim();
+        const errAlert = document.getElementById("login-error-alert");
+        const btn = document.getElementById("login-submit-btn");
+
+        btn.disabled = true;
+        btn.innerHTML = "Authenticating with server...";
+        errAlert.style.display = "none";
+
+        try {
+          const res = await fetch("/api/admin/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email, password })
+          });
+          const data = await res.json();
+
+          if (data.success && data.user) {
+            localStorage.setItem("hk_admin_session", JSON.stringify(data.user));
+            window.location.href = "/admin/dashboard";
+          } else {
+            btn.disabled = false;
+            btn.innerHTML = `<span>Authenticate & Access Dashboard</span>`;
+            errAlert.textContent = data.error || "Authentication failed.";
+            errAlert.style.display = "block";
+          }
+        } catch(err) {
+          // Graceful local fallback
+          if ((email === "keshara@hkevent.lk" || email === "admin@hkevent.lk") && password === "admin123") {
+            const user = { email, name: "Keshara Sahan", role: "admin", loginTime: Date.now() };
+            localStorage.setItem("hk_admin_session", JSON.stringify(user));
+            window.location.href = "/admin/dashboard";
+          } else {
+            btn.disabled = false;
+            btn.innerHTML = `<span>Authenticate & Access Dashboard</span>`;
+            errAlert.textContent = "Server error or invalid credentials.";
+            errAlert.style.display = "block";
+          }
+        }
+      });
+    });
+
+    function demoLogin() {
+      document.getElementById("login-email").value = "keshara@hkevent.lk";
+      document.getElementById("login-password").value = "admin123";
+      document.getElementById("admin-login-form").dispatchEvent(new Event("submit"));
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,71 @@
+/* ===================================================================
+   HK EVENT MANAGEMENT — DESIGN TOKENS & VARIABLES
+   Theme: Luxury Light Professional (Warm White, Gold & Charcoal)
+   Client: Keshara Sahan
+   =================================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700;800&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap');
+
+:root {
+  /* Color Palette — Light Professional Canvas */
+  --bg-body: #fbfbfd;
+  --bg-surface: #ffffff;
+  --bg-surface-elevated: #ffffff;
+  --bg-subtle: #f4f5f8;
+  --bg-warm: #faf7f2;
+  --bg-champagne: #fcf9f2;
+  --bg-dark-card: #15181e;
+  
+  /* Brand Accents — Majestic Gold */
+  --gold-primary: #b8860b;
+  --gold-accent: #c69214;
+  --gold-bright: #dfa824;
+  --gold-light: #fef8eb;
+  --gold-subtle: rgba(198, 146, 20, 0.12);
+  --gold-border: rgba(198, 146, 20, 0.28);
+  --gold-gradient: linear-gradient(135deg, #d4af37 0%, #b8860b 50%, #996515 100%);
+  --gold-gradient-soft: linear-gradient(135deg, rgba(212, 175, 55, 0.12) 0%, rgba(184, 134, 11, 0.05) 100%);
+  --gold-gradient-text: linear-gradient(135deg, #a47107 0%, #caa02e 50%, #8f6100 100%);
+  
+  /* Neutral & Obsidian Typography */
+  --text-primary: #111827;
+  --text-secondary: #4b5563;
+  --text-muted: #808999;
+  --text-light: #ffffff;
+  --text-gold: #b8860b;
+  
+  /* Structural Borders */
+  --border-subtle: rgba(17, 24, 39, 0.08);
+  --border-card: rgba(17, 24, 39, 0.06);
+  --border-focus: #c69214;
+  
+  /* Elevation & Shadows */
+  --shadow-xs: 0 1px 3px rgba(15, 23, 42, 0.04);
+  --shadow-sm: 0 4px 12px rgba(15, 23, 42, 0.05);
+  --shadow-md: 0 8px 24px rgba(15, 23, 42, 0.07);
+  --shadow-lg: 0 18px 40px -4px rgba(15, 23, 42, 0.1);
+  --shadow-gold: 0 12px 32px -4px rgba(198, 146, 20, 0.22);
+  --shadow-gold-sm: 0 6px 18px rgba(198, 146, 20, 0.15);
+  --shadow-modal: 0 25px 60px -15px rgba(15, 23, 42, 0.25);
+  
+  /* Typography */
+  --font-serif: 'Playfair Display', Georgia, serif;
+  --font-display: 'Cinzel', Georgia, serif;
+  --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  
+  /* Sizing & Spacing */
+  --max-width: 1280px;
+  --header-height: 84px;
+  --header-topbar-height: 40px;
+  --radius-xs: 4px;
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-xl: 30px;
+  --radius-full: 9999px;
+  
+  /* Transitions */
+  --transition-fast: 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  --transition-normal: 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  --transition-smooth: 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
