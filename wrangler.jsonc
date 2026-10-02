@@ -15,5 +15,13 @@
       "binding": "hkevent",
       "bucket_name": "hkevent"
     }
-  ]
+  ],
+  "vars": {
+    "FIREBASE_PROJECT_ID": "hkevent-522e9",
+    "FIREBASE_API_KEY": "AIzaSyBIyOSZmWlDzgGODjZik44cf-I5e3hxYT0",
+    "R2_BUCKET_NAME": "hkevent",
+    "R2_PUBLIC_URL": "https://pub-c47f04a613d14342a14ecef1be67548b.r2.dev",
+    "ADMIN_EMAIL": "keshara@hkevent.lk",
+    "ADMIN_PASSWORD": "admin123"
+  }
 }
