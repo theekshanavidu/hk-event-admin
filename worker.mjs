@@ -1,6 +1,6 @@
 // ===================================================================
-// CLOUDFLARE WORKER / PAGES _WORKER: HK EVENT MANAGEMENT ADMIN
-// Zero-Server Cloudflare Architecture (Cloudflare Workers & R2 Storage)
+// CLOUDFLARE WORKER: HK EVENT MANAGEMENT ADMIN CONTROL CENTER
+// Zero-Server Cloudflare Architecture (Workers, R2 Storage & Firestore)
 // ===================================================================
 
 const CORS_HEADERS = {
@@ -74,6 +74,40 @@ function toFirestoreFields(obj) {
   return fields;
 }
 
+// Global cached Firebase Auth token for writing to Firestore
+let cachedIdToken = null;
+let tokenExpiresAt = 0;
+
+async function getFirebaseAuthToken(apiKey, email, password) {
+  const now = Date.now();
+  if (cachedIdToken && now < tokenExpiresAt - 60000) {
+    return cachedIdToken;
+  }
+  try {
+    const authUrl = `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${apiKey}`;
+    const res = await fetch(authUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: email || "keshara@hkevent.lk",
+        password: password || "admin123",
+        returnSecureToken: true
+      })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      cachedIdToken = data.idToken;
+      tokenExpiresAt = now + (parseInt(data.expiresIn, 10) * 1000);
+      return cachedIdToken;
+    } else {
+      console.warn("Firebase Auth signIn failed:", await res.text());
+    }
+  } catch (e) {
+    console.error("Firebase Auth error:", e);
+  }
+  return null;
+}
+
 async function handleApiRequest(request, env) {
   const url = new URL(request.url);
   const path = url.pathname.replace(/\/+$/, "");
@@ -85,20 +119,30 @@ async function handleApiRequest(request, env) {
 
   const projectId = (env && env.FIREBASE_PROJECT_ID) || "hkevent-522e9";
   const apiKey = (env && env.FIREBASE_API_KEY) || "AIzaSyBIyOSZmWlDzgGODjZik44cf-I5e3hxYT0";
+  const adminEmail = (env && env.ADMIN_EMAIL) || "keshara@hkevent.lk";
+  const adminPass = (env && env.ADMIN_PASSWORD) || "admin123";
   const firestoreBase = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents`;
   const r2PublicUrl = ((env && env.R2_PUBLIC_URL) || "https://pub-c47f04a613d14342a14ecef1be67548b.r2.dev").replace(/\/+$/, "");
+  const r2Bucket = env && (env.hkevent || env.BUCKET);
+
+  // Helper to get authenticated headers for Firestore writes
+  const getAuthHeaders = async () => {
+    const token = await getFirebaseAuthToken(apiKey, adminEmail, adminPass);
+    const headers = { "Content-Type": "application/json" };
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+    return headers;
+  };
 
   try {
+    // ---------------------------------------------------------------
     // 0. Admin Authentication
+    // ---------------------------------------------------------------
     if (path === "/api/admin/login" && method === "POST") {
       const body = await request.json();
       const email = (body.email || "").trim().toLowerCase();
       const password = (body.password || "").trim();
 
-      const adminEmail = ((env && env.ADMIN_EMAIL) || "keshara@hkevent.lk").toLowerCase();
-      const adminPass = (env && env.ADMIN_PASSWORD) || "admin123";
-
-      if ((email === adminEmail || email === "admin@hkevent.lk") && (password === adminPass || password === "admin123")) {
+      if ((email === adminEmail.toLowerCase() || email === "admin@hkevent.lk") && (password === adminPass || password === "admin123")) {
         const user = {
           email: "keshara@hkevent.lk",
           name: "Keshara Sahan",
@@ -111,9 +155,11 @@ async function handleApiRequest(request, env) {
       }
     }
 
+    // ---------------------------------------------------------------
     // 1. Healthcheck & System Status
+    // ---------------------------------------------------------------
     if (path === "/api/system/status" && method === "GET") {
-      const hasR2Binding = !!(env && (env.hkevent || env.BUCKET));
+      const hasR2Binding = !!r2Bucket;
       return jsonResponse({
         status: "ok",
         platform: "Cloudflare Serverless Edge",
@@ -121,14 +167,17 @@ async function handleApiRequest(request, env) {
         r2Bucket: (env && env.R2_BUCKET_NAME) || "hkevent",
         r2PublicUrl,
         firestoreProject: projectId,
-        adminEmail: (env && env.ADMIN_EMAIL) || "keshara@hkevent.lk"
+        adminEmail
       });
     }
 
+    // ---------------------------------------------------------------
     // 2. Inquiries API
+    // ---------------------------------------------------------------
     if (path === "/api/inquiries") {
       if (method === "GET") {
-        const res = await fetch(`${firestoreBase}/inquiries?key=${apiKey}`);
+        const headers = await getAuthHeaders();
+        const res = await fetch(`${firestoreBase}/inquiries?key=${apiKey}`, { headers });
         if (!res.ok) {
           return jsonResponse({ success: true, inquiries: [], source: "empty" });
         }
@@ -155,9 +204,10 @@ async function handleApiRequest(request, env) {
           createdAt: new Date().toISOString()
         };
 
+        const headers = await getAuthHeaders();
         await fetch(`${firestoreBase}/inquiries?documentId=${id}&key=${apiKey}`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers,
           body: JSON.stringify({ fields: toFirestoreFields(newInquiry) })
         });
 
@@ -172,11 +222,13 @@ async function handleApiRequest(request, env) {
     const inqMatch = path.match(/^\/api\/inquiries\/([^/]+)$/);
     if (inqMatch) {
       const inqId = inqMatch[1];
+      const headers = await getAuthHeaders();
+
       if (method === "PATCH") {
         const body = await request.json();
         const res = await fetch(`${firestoreBase}/inquiries/${inqId}?updateMask.fieldPaths=status&key=${apiKey}`, {
           method: "PATCH",
-          headers: { "Content-Type": "application/json" },
+          headers,
           body: JSON.stringify({ fields: { status: { stringValue: body.status || "reviewed" } } })
         });
         const updated = cleanFirestoreDoc(await res.json());
@@ -184,16 +236,19 @@ async function handleApiRequest(request, env) {
       }
 
       if (method === "DELETE") {
-        await fetch(`${firestoreBase}/inquiries/${inqId}?key=${apiKey}`, { method: "DELETE" });
+        await fetch(`${firestoreBase}/inquiries/${inqId}?key=${apiKey}`, { method: "DELETE", headers });
         return jsonResponse({ success: true, message: "Inquiry deleted" });
       }
     }
 
+    // ---------------------------------------------------------------
     // 3. Projects API
+    // ---------------------------------------------------------------
     if (path === "/api/projects") {
       if (method === "GET") {
         const includeDrafts = url.searchParams.get("all") === "true";
-        const res = await fetch(`${firestoreBase}/projects?key=${apiKey}`);
+        const headers = await getAuthHeaders();
+        const res = await fetch(`${firestoreBase}/projects?key=${apiKey}`, { headers });
         let projects = [];
         if (res.ok) {
           const data = await res.json();
@@ -230,11 +285,18 @@ async function handleApiRequest(request, env) {
           updatedAt: new Date().toISOString()
         };
 
-        await fetch(`${firestoreBase}/projects?documentId=${id}&key=${apiKey}`, {
+        const headers = await getAuthHeaders();
+        const writeRes = await fetch(`${firestoreBase}/projects?documentId=${id}&key=${apiKey}`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers,
           body: JSON.stringify({ fields: toFirestoreFields(newProject) })
         });
+
+        if (!writeRes.ok) {
+          const errData = await writeRes.text();
+          console.error("Firestore project creation failed:", errData);
+          return jsonResponse({ success: false, error: "Firestore error creating project: " + errData }, 500);
+        }
 
         return jsonResponse({ success: true, project: newProject }, 201);
       }
@@ -243,8 +305,10 @@ async function handleApiRequest(request, env) {
     const projMatch = path.match(/^\/api\/projects\/([^/]+)$/);
     if (projMatch) {
       const idOrSlug = projMatch[1];
+      const headers = await getAuthHeaders();
+
       if (method === "GET") {
-        const res = await fetch(`${firestoreBase}/projects?key=${apiKey}`);
+        const res = await fetch(`${firestoreBase}/projects?key=${apiKey}`, { headers });
         let project = null;
         if (res.ok) {
           const data = await res.json();
@@ -257,27 +321,37 @@ async function handleApiRequest(request, env) {
 
       if (method === "PUT") {
         const body = await request.json();
+        // Fetch current project first to preserve fields
+        const getRes = await fetch(`${firestoreBase}/projects/${idOrSlug}?key=${apiKey}`, { headers });
+        let existing = {};
+        if (getRes.ok) {
+          existing = cleanFirestoreDoc(await getRes.json());
+        }
         const updated = {
+          ...existing,
           ...body,
           updatedAt: new Date().toISOString()
         };
-        await fetch(`${firestoreBase}/projects/${idOrSlug}?key=${apiKey}`, {
+        const patchRes = await fetch(`${firestoreBase}/projects/${idOrSlug}?key=${apiKey}`, {
           method: "PATCH",
-          headers: { "Content-Type": "application/json" },
+          headers,
           body: JSON.stringify({ fields: toFirestoreFields(updated) })
         });
+        if (!patchRes.ok) {
+          console.error("Firestore project update failed:", await patchRes.text());
+        }
         return jsonResponse({ success: true, project: updated });
       }
 
       if (method === "DELETE") {
-        await fetch(`${firestoreBase}/projects/${idOrSlug}?key=${apiKey}`, { method: "DELETE" });
+        await fetch(`${firestoreBase}/projects/${idOrSlug}?key=${apiKey}`, { method: "DELETE", headers });
         return jsonResponse({ success: true, message: "Project deleted" });
       }
     }
 
-    // 4. Cloudflare R2 Uploads
-    const r2Bucket = env && (env.hkevent || env.BUCKET);
-
+    // ---------------------------------------------------------------
+    // 4. Cloudflare R2 Uploads (Cover Photos)
+    // ---------------------------------------------------------------
     if (path === "/api/upload" && method === "POST") {
       const contentType = request.headers.get("content-type") || "";
       let fileBuffer = null;
@@ -319,9 +393,13 @@ async function handleApiRequest(request, env) {
       const key = `projects/${folder}/${filename}`;
 
       if (r2Bucket) {
-        await r2Bucket.put(key, fileBuffer, {
-          httpMetadata: { contentType: fileType }
-        });
+        try {
+          await r2Bucket.put(key, fileBuffer, {
+            httpMetadata: { contentType: fileType }
+          });
+        } catch (r2Err) {
+          console.warn("R2 Put error:", r2Err.message);
+        }
       }
 
       const fileUrl = `${r2PublicUrl}/${key}`;
@@ -334,76 +412,143 @@ async function handleApiRequest(request, env) {
       });
     }
 
-    // 5. Gallery Batch Upload to a Project
-    const galleryMatch = path.match(/^\/api\/projects\/([^/]+)\/gallery$/);
-    if (galleryMatch && method === "POST") {
-      const projId = galleryMatch[1];
-      const formData = await request.formData();
-      const files = formData.getAll("images");
-      const captions = formData.getAll("captions");
-
-      const projRes = await fetch(`${firestoreBase}/projects/${projId}?key=${apiKey}`);
+    // ---------------------------------------------------------------
+    // 5. Project Images / Gallery Uploads (Matches BOTH /images and /gallery)
+    // ---------------------------------------------------------------
+    const imagesMatch = path.match(/^\/api\/projects\/([^/]+)\/(images|gallery)$/);
+    if (imagesMatch && method === "POST") {
+      const projId = imagesMatch[1];
+      const headers = await getAuthHeaders();
+      const projRes = await fetch(`${firestoreBase}/projects/${projId}?key=${apiKey}`, { headers });
       if (!projRes.ok) return jsonResponse({ success: false, error: "Project not found" }, 404);
       const projData = cleanFirestoreDoc(await projRes.json());
       const existingImages = projData.images || [];
-      const newImages = [];
 
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        if (typeof file === "object") {
-          const fileBuffer = await file.arrayBuffer();
-          const fileType = file.type || "image/jpeg";
-          const filename = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g, "_")}`;
-          const key = `projects/${projData.slug || "gallery"}/${filename}`;
+      const contentType = request.headers.get("content-type") || "";
 
-          if (r2Bucket) {
-            await r2Bucket.put(key, fileBuffer, {
-              httpMetadata: { contentType: fileType }
-            });
+      // Case A: Multipart form upload (Direct file from admin)
+      if (contentType.includes("multipart/form-data")) {
+        const formData = await request.formData();
+        const singleFile = formData.get("image");
+        const multiFiles = formData.getAll("images");
+        const fileList = (multiFiles && multiFiles.length > 0) ? multiFiles : (singleFile ? [singleFile] : []);
+        const caption = formData.get("caption") || "";
+
+        const addedImages = [];
+
+        for (let i = 0; i < fileList.length; i++) {
+          const file = fileList[i];
+          if (file && typeof file === "object" && file.size > 0) {
+            const fileBuffer = await file.arrayBuffer();
+            const fileType = file.type || "image/jpeg";
+            const filename = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g, "_")}`;
+            const key = `projects/${projData.slug || "gallery"}/${filename}`;
+
+            if (r2Bucket) {
+              try {
+                await r2Bucket.put(key, fileBuffer, {
+                  httpMetadata: { contentType: fileType }
+                });
+              } catch (r2Err) {
+                console.warn("R2 Put error:", r2Err.message);
+              }
+            }
+
+            const fileUrl = `${r2PublicUrl}/${key}`;
+            const imgObj = {
+              id: "img_" + Date.now() + "_" + i,
+              url: fileUrl,
+              thumbnailUrl: fileUrl,
+              r2Key: key,
+              caption: caption || file.name.replace(/\.[^/.]+$/, ""),
+              altText: caption || file.name.replace(/\.[^/.]+$/, ""),
+              sortOrder: existingImages.length + addedImages.length + 1,
+              createdAt: new Date().toISOString()
+            };
+            addedImages.push(imgObj);
           }
-
-          const fileUrl = `${r2PublicUrl}/${key}`;
-          const imgObj = {
-            id: "img_" + Date.now() + "_" + i,
-            url: fileUrl,
-            thumbnailUrl: fileUrl,
-            r2Key: key,
-            caption: captions[i] || file.name,
-            altText: captions[i] || file.name,
-            sortOrder: existingImages.length + i + 1,
-            createdAt: new Date().toISOString()
-          };
-          newImages.push(imgObj);
         }
+
+        if (addedImages.length === 0) {
+          return jsonResponse({ success: false, error: "No valid image files received" }, 400);
+        }
+
+        projData.images = [...existingImages, ...addedImages];
+        projData.updatedAt = new Date().toISOString();
+
+        await fetch(`${firestoreBase}/projects/${projId}?key=${apiKey}`, {
+          method: "PATCH",
+          headers,
+          body: JSON.stringify({ fields: toFirestoreFields(projData) })
+        });
+
+        return jsonResponse({
+          success: true,
+          message: "Photo(s) uploaded successfully",
+          uploaded: addedImages,
+          image: addedImages[0],
+          project: projData
+        }, 201);
       }
 
-      projData.images = [...existingImages, ...newImages];
-      projData.updatedAt = new Date().toISOString();
+      // Case B: JSON payload with direct image URL
+      if (contentType.includes("application/json")) {
+        const body = await request.json();
+        const url = (body.url || "").trim();
+        const caption = (body.caption || "").trim();
 
-      await fetch(`${firestoreBase}/projects/${projId}?key=${apiKey}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fields: toFirestoreFields(projData) })
-      });
+        if (!url) return jsonResponse({ success: false, error: "URL is required" }, 400);
 
-      return jsonResponse({ success: true, uploaded: newImages, project: projData });
+        const imgObj = {
+          id: "img_" + Date.now(),
+          url,
+          thumbnailUrl: url,
+          r2Key: "",
+          caption: caption || "Event Photo",
+          altText: caption || "Event Photo",
+          sortOrder: existingImages.length + 1,
+          createdAt: new Date().toISOString()
+        };
+
+        projData.images = [...existingImages, imgObj];
+        projData.updatedAt = new Date().toISOString();
+
+        await fetch(`${firestoreBase}/projects/${projId}?key=${apiKey}`, {
+          method: "PATCH",
+          headers,
+          body: JSON.stringify({ fields: toFirestoreFields(projData) })
+        });
+
+        return jsonResponse({
+          success: true,
+          message: "Photo added successfully",
+          image: imgObj,
+          project: projData
+        }, 201);
+      }
+
+      return jsonResponse({ success: false, error: "Unsupported content type" }, 400);
     }
 
+    // ---------------------------------------------------------------
     // 6. Delete Image from Project
+    // ---------------------------------------------------------------
     const delImgMatch = path.match(/^\/api\/projects\/([^/]+)\/images\/([^/]+)$/);
     if (delImgMatch && method === "DELETE") {
       const [, projId, imageId] = delImgMatch;
-      const projRes = await fetch(`${firestoreBase}/projects/${projId}?key=${apiKey}`);
+      const headers = await getAuthHeaders();
+      const projRes = await fetch(`${firestoreBase}/projects/${projId}?key=${apiKey}`, { headers });
       if (projRes.ok) {
         const projData = cleanFirestoreDoc(await projRes.json());
         let images = projData.images || [];
         const imgToDelete = images.find(img => img.id === imageId);
         images = images.filter(img => img.id !== imageId);
         projData.images = images;
+        projData.updatedAt = new Date().toISOString();
 
         await fetch(`${firestoreBase}/projects/${projId}?key=${apiKey}`, {
           method: "PATCH",
-          headers: { "Content-Type": "application/json" },
+          headers,
           body: JSON.stringify({ fields: toFirestoreFields(projData) })
         });
 
@@ -429,6 +574,7 @@ export default {
     const url = new URL(request.url);
     const path = url.pathname.replace(/\/+$/, "") || "/";
 
+    // 1. Edge API Routes
     if (path.startsWith("/api")) {
       return handleApiRequest(request, env);
     }
